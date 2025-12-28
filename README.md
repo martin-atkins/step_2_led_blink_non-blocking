@@ -54,5 +54,19 @@ Building from step 1 with non-blocking
 ### Coding updates
 * In `main.c`:
   * **Start timer with interrupts**
-    * 
-
+    * inside `main()`:
+      ```
+      MX_TIM2_Init();
+      HAL_TIM_Base_Start_IT(&htim2);
+      ```
+  * **Callback implementation**
+    * add **outside** `main()`:
+      ```
+      void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+      {
+          if (htim->Instance == TIM2)
+          {
+              HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+          }
+      }
+      ```
