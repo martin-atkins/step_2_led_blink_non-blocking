@@ -70,3 +70,116 @@ Building from step 1 with non-blocking
           }
       }
       ```
+## UPDATE : replace the LED toggle with a software state machine driven by the timer
+### Design first
+* **Rule 1** — ISRs should be dumb
+  * Interrupts should:
+    * Tick time
+    * Set flags
+    * Never contain behavior logic
+* **Rule 2** — Behavior lives in the main loop
+  * The main loop:
+    * Runs a state machine
+    * Reacts to time events
+    * Is testable and scalable
+
+### Target behavior
+* We’ll implement 3 LED modes:
+  * Mode	Pattern
+    * `MODE_OFF`	LED off
+    * `MODE_SLOW`	Blink 1 Hz
+    * `MODE_FAST`	Blink 5 Hz
+
+### Step 1 — Reconfigure TIM2 (1 ms tick)
+* In CubeMX, adjust TIM2:
+  * **Prescaler**: `16000 - 1`
+  * **Period**: `1 - 1`
+* This gives ~1 kHz interrupt (1 ms)
+* Then regenerate code.
+### Step 2 — Global timing variables
+* Add near the top of `main.c`:
+  ```
+  volatile uint32_t system_tick_ms = 0;
+  ```
+### Step 3 — Minimal ISR (tick only)
+* Replace the callback with this:
+  ```
+  void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+  {
+      if (htim->Instance == TIM2)
+      {
+          system_tick_ms++;
+      }
+  }
+  ```
+### Step 4 — Define the LED state machine
+* Add above `main()`:
+  ```
+  typedef enum
+  {
+      LED_MODE_OFF = 0,
+      LED_MODE_SLOW,
+      LED_MODE_FAST
+  } led_mode_t;
+  
+  typedef struct
+  {
+      led_mode_t mode;
+      uint32_t   last_toggle_ms;
+      uint32_t   interval_ms;
+      uint8_t    led_on;
+  } led_ctrl_t;
+  ```
+### Step 5 — Initialize the controller
+* Inside `main()` **after GPIO init**:
+  ```
+  led_ctrl_t led =
+  {
+      .mode = LED_MODE_SLOW,
+      .last_toggle_ms = 0,
+      .interval_ms = 500,
+      .led_on = 0
+  };
+  ```
+### Step 6 — State machine update function
+* Add this below `main()`:
+  ```
+  void led_update(led_ctrl_t *ctrl, uint32_t now_ms)
+  {
+      switch (ctrl->mode)
+      {
+          case LED_MODE_OFF:
+              HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+              ctrl->led_on = 0;
+              break;
+            case LED_MODE_SLOW:
+              ctrl->interval_ms = 500;
+              break;
+            case LED_MODE_FAST:
+              ctrl->interval_ms = 100;
+              break;
+      }
+  
+      if (ctrl->mode != LED_MODE_OFF)
+      {
+          if ((now_ms - ctrl->last_toggle_ms) >= ctrl->interval_ms)
+          {
+              ctrl->last_toggle_ms = now_ms;
+              ctrl->led_on ^= 1;
+              HAL_GPIO_WritePin(
+                  LD2_GPIO_Port,
+                  LD2_Pin,
+                  ctrl->led_on ? GPIO_PIN_SET : GPIO_PIN_RESET
+              );
+          }
+      }
+  }
+  ```
+### Step 7 — Main loop
+* Replace `while(1)` with:
+  ```
+  while (1)
+  {
+      led_update(&led, system_tick_ms);
+  }
+  ```
