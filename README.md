@@ -90,12 +90,12 @@ Building from step 1 with non-blocking
     * `MODE_SLOW`	Blink 1 Hz
     * `MODE_FAST`	Blink 5 Hz
 
-### Step 1 — Reconfigure TIM2 (1 ms tick)
+### Step 1 — Reconfigure TIM2 (10 ms tick)
 * In CubeMX, adjust TIM2:
   * **Prescaler**: `16000 - 1`
   * **Period**: `10 - 1`
-* This gives ~1 kHz interrupt (1 ms)
-* Then regenerate code.
+
+Then regenerate code.
 ### Step 2 — Global timing variables
 * Add near the top of `main.c`:
   ```
