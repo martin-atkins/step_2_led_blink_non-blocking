@@ -209,4 +209,3 @@ When TIM2 reaches its auto-reload value, this happens in hardware and software:
   * In the HAL library, this function is defined as **weak**
   * So when HAL reaches this line: `HAL_TIM_PeriodElapsedCallback(htim);`
     * my function runs
-  * 
